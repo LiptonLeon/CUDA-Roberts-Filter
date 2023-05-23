@@ -13,16 +13,19 @@ const char* outputPath = "../res/output.png";
 
 float* loadImageData (const unsigned char* img, unsigned int size);
 unsigned char* saveImageData (const float* img, unsigned int size);
-__global__ void robertsFilter(const float* input, float* output, int width, int height, int mode);
+__global__ void robertsFilter(const float* input, float* output, int width, int height, int mode, int strength);
 
 int main() {
     int width;
     int height;
     int rgb;
     int mode;
+    int strength;
 
     std::cout << "1. Default\n2. Only gx\n3. Only gy\n4. Light mode\nSELECT: ";
     std::cin >> mode;
+    std::cout << "STRENGTH (1 is default): ";
+    std::cin >> strength;
 
     std::cout << "\nLoading image...\n";
     unsigned char* image = stbi_load(inputPath, &width, &height, &rgb, CHANNELS);
@@ -41,7 +44,7 @@ int main() {
     dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
 
     std::cout << "Processing image...\n";
-    robertsFilter<<<gridSize, blockSize>>>(deviceInput, deviceOutput, width, height, mode);
+    robertsFilter<<<gridSize, blockSize>>>(deviceInput, deviceOutput, width, height, mode, strength);
     cudaMemcpy(hostOutput, deviceOutput, imageSize, cudaMemcpyDeviceToHost);
 
     std::cout << "Saving result...\n";
@@ -60,13 +63,13 @@ int main() {
     return 0;
 }
 
-__global__ void robertsFilter(const float* input, float* output, int width, int height, int mode) {
+__global__ void robertsFilter(const float* input, float* output, int width, int height, int mode, int strength) {
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < width - 1 && y < height - 1) {
-        float gx = input[y * width + x] - input[(y+1) * width + (x+1)];
-        float gy = input[y * width + (x+1)] - input[(y+1) * width + x];
+        float gx = input[y * width + x] - input[(y+strength) * width + (x+strength)];
+        float gy = input[y * width + (x+strength)] - input[(y+strength) * width + x];
 
         if(mode == 2)
             gy = 0.0;
