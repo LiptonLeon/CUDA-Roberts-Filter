@@ -8,12 +8,12 @@
 #define CHANNELS 3
 #define BLOCK_SIZE 32
 
-const char* inputPath = "../res/input2.png";
+const char* inputPath = "../res/input3.png";
 const char* outputPath = "../res/output.png";
 
-unsigned int* loadImageData (const unsigned char* img, unsigned int size);
-unsigned char* saveImageData (const unsigned int* img, unsigned int size);
-__global__ void robertsFilter(const unsigned int* input, unsigned int* output, int width, int height);
+float* loadImageData (const unsigned char* img, unsigned int size);
+unsigned char* saveImageData (const float* img, unsigned int size);
+__global__ void robertsFilter(const float* input, float* output, int width, int height);
 
 int main() {
     int width;
@@ -21,10 +21,10 @@ int main() {
     int rgb;
 
     unsigned char* image = stbi_load(inputPath, &width, &height, &rgb, CHANNELS);
-    unsigned int* hostInput = loadImageData(image, width * height * CHANNELS);
-    unsigned int* hostOutput = (unsigned int*)malloc(width * height * sizeof(unsigned int));
-    unsigned int* deviceInput;
-    unsigned int* deviceOutput;
+    float* hostInput = loadImageData(image, width * height * CHANNELS);
+    float* hostOutput = (float*)malloc(width * height * sizeof(float));
+    float* deviceInput;
+    float* deviceOutput;
 
     unsigned int imageSize = width * height * sizeof(unsigned int);
 
@@ -54,28 +54,30 @@ int main() {
     return 0;
 }
 
-__global__ void robertsFilter(const unsigned int* input, unsigned int* output, int width, int height) {
+__global__ void robertsFilter(const float* input, float* output, int width, int height) {
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < width - 1 && y < height - 1) {
-        unsigned int gx = input[(y+1) * width + x+1] - input[y * width + x];
-        unsigned int gy = input[(y+1) * width + x] - input[y * width + x+1];
+        float gx = input[y * width + x] - input[(y+1) * width + (x+1)];
+        float gy = input[y * width + (x+1)] - input[(y+1) * width + x];
         double magnitude = sqrtf((float)(gx * gx + gy * gy));
 
-        output[y * width + x] = (unsigned char)(magnitude);
+        output[y * width + x] = (float)(magnitude);
+        //output[y * width + x] = input[y * width + x];
     }
+
 }
 
-unsigned int* loadImageData (const unsigned char* img, unsigned int size) {
-    unsigned int* data = new unsigned int[size / CHANNELS];
+float* loadImageData (const unsigned char* img, unsigned int size) {
+    float* data = new float[size / CHANNELS];
 
     int sum = 0;
 
     for (unsigned int i = 0; i < size; ++i) {
         sum += img[i];
         if ((i + 1) % CHANNELS == 0) {
-            data[i / CHANNELS] = sum > 0 ? 1 : 0;
+            data[i / CHANNELS] = (sum / 3.f) / 255.f;
             sum = 0;
         }
     }
@@ -83,7 +85,7 @@ unsigned int* loadImageData (const unsigned char* img, unsigned int size) {
     return data;
 }
 
-unsigned char* saveImageData (const unsigned int* img, unsigned int size) {
+unsigned char* saveImageData (const float* img, unsigned int size) {
     unsigned char* data = new unsigned char[size * CHANNELS];
 
     for (unsigned int i = 0; i < size; ++i) {
